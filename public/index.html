@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人知识库</title>
+    <meta name="description" content="个人知识管理系统">
+    
+    <!-- PWA 配置 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1a1a2e">
+    <link rel="icon" href="/icons/icon-192.png" type="image/png">
+    
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">知识库</h1>
+                <nav class="nav">
+                    <a href="#" class="nav-link active" data-page="home">首页</a>
+                    <a href="#" class="nav-link" data-page="categories">分类</a>
+                    <a href="#" class="nav-link" data-page="tags">标签</a>
+                    <a href="#" class="nav-link admin-login" data-page="admin">管理</a>
+                </nav>
+                <button class="theme-toggle" aria-label="切换主题">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- 首页 -->
+            <section id="home-page" class="page active">
+                <div class="page-header">
+                    <h2>最新文章</h2>
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="搜索文章...">
+                        <button id="search-btn">搜索</button>
+                    </div>
+                </div>
+                <div class="articles-grid" id="articles-grid">
+                    <!-- 文章将通过JS动态加载 -->
+                </div>
+            </section>
+
+            <!-- 分类页面 -->
+            <section id="categories-page" class="page">
+                <div class="page-header">
+                    <h2>分类</h2>
+                </div>
+                <div class="categories-container" id="categories-container">
+                    <!-- 分类将通过JS动态加载 -->
+                </div>
+            </section>
+
+            <!-- 标签页面 -->
+            <section id="tags-page" class="page">
+                <div class="page-header">
+                    <h2>标签</h2>
+                </div>
+                <div class="tags-container" id="tags-container">
+                    <!-- 标签将通过JS动态加载 -->
+                </div>
+            </section>
+
+            <!-- 文章详情页面 -->
+            <section id="article-page" class="page">
+                <div class="article-header">
+                    <button class="back-btn" id="back-btn">← 返回</button>
+                    <h2 id="article-title"></h2>
+                    <div class="article-meta">
+                        <span class="category-badge" id="article-category"></span>
+                        <div class="tags-list" id="article-tags"></div>
+                        <span class="article-date" id="article-date"></span>
+                    </div>
+                </div>
+                <div class="article-content" id="article-content">
+                    <!-- 文章内容将通过JS动态加载 -->
+                </div>
+            </section>
+
+            <!-- 管理登录页面 -->
+            <section id="admin-login-page" class="page">
+                <div class="login-form">
+                    <h2>管理员登录</h2>
+                    <input type="password" id="admin-password" placeholder="输入管理员密码">
+                    <button id="login-btn">登录</button>
+                </div>
+            </section>
+
+            <!-- 管理后台页面 -->
+            <section id="admin-page" class="page">
+                <div class="admin-header">
+                    <h2>知识库管理</h2>
+                    <div class="admin-actions">
+                        <button id="export-btn">导出数据</button>
+                        <button id="import-btn">导入数据</button>
+                        <input type="file" id="import-file" accept=".json" style="display: none;">
+                        <button id="logout-btn">退出</button>
+                    </div>
+                </div>
+                
+                <div class="admin-tabs">
+                    <button class="tab-btn active" data-tab="articles-tab">文章管理</button>
+                    <button class="tab-btn" data-tab="categories-tab">分类管理</button>
+                    <button class="tab-btn" data-tab="tags-tab">标签管理</button>
+                </div>
+                
+                <div class="tab-content">
+                    <!-- 文章管理 -->
+                    <div id="articles-tab" class="tab-pane active">
+                        <div class="toolbar">
+                            <button id="new-article-btn">新建文章</button>
+                        </div>
+                        <div class="admin-articles-list" id="admin-articles-list">
+                            <!-- 文章管理列表 -->
+                        </div>
+                    </div>
+                    
+                    <!-- 分类管理 -->
+                    <div id="categories-tab" class="tab-pane">
+                        <div class="toolbar">
+                            <button id="new-category-btn">新建分类</button>
+                        </div>
+                        <div class="categories-editor" id="categories-editor">
+                            <!-- 分类编辑器 -->
+                        </div>
+                    </div>
+                    
+                    <!-- 标签管理 -->
+                    <div id="tags-tab" class="tab-pane">
+                        <div class="toolbar">
+                            <button id="new-tag-btn">新建标签</button>
+                        </div>
+                        <div class="tags-editor" id="tags-editor">
+                            <!-- 标签编辑器 -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- 文章编辑器模态框 -->
+    <div id="article-editor-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>编辑文章</h3>
+                <button class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="article-form">
+                    <div class="form-group">
+                        <label for="article-title-input">标题</label>
+                        <input type="text" id="article-title-input" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="article-category-select">分类</label>
+                        <select id="article-category-select">
+                            <!-- 分类选项将通过JS动态加载 -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="article-tags-select">标签</label>
+                        <select id="article-tags-select" multiple>
+                            <!-- 标签选项将通过JS动态加载 -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="article-content-textarea">内容</label>
+                        <textarea id="article-content-textarea" rows="15" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="article-published-checkbox">
+                            发布文章
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" id="cancel-article-btn">取消</button>
+                        <button type="submit" id="save-article-btn">保存</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
