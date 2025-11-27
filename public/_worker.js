@@ -121,14 +121,18 @@ async function handleGetArticles(env, corsHeaders) {
       kv.get('tags')
     ]);
     
-    const articles = articlesData ? JSON.parse(articlesData) : [];
-    const categories = categoriesData ? JSON.parse(categoriesData) : {};
-    const tags = tagsData ? JSON.parse(tagsData) : {};
+    // 如果数据为空，返回默认的空数据结构
+    let articles = articlesData ? JSON.parse(articlesData) : [];
+    let categories = categoriesData ? JSON.parse(categoriesData) : {};
+    let tags = tagsData ? JSON.parse(tagsData) : {};
+    
+    // 确保 articles 是数组
+    if (!Array.isArray(articles)) {
+      articles = Object.values(articles);
+    }
     
     // 只返回已发布的文章
-    const publishedArticles = Array.isArray(articles) 
-      ? articles.filter(article => article.published)
-      : Object.values(articles).filter(article => article.published);
+    const publishedArticles = articles.filter(article => article.published);
     
     return new Response(JSON.stringify({
       success: true,
@@ -142,11 +146,18 @@ async function handleGetArticles(env, corsHeaders) {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   } catch (error) {
+    console.error('Error in handleGetArticles:', error);
+    
+    // 出错时返回空数据而不是错误
     return new Response(JSON.stringify({
-      success: false,
-      error: error.message
+      success: true,
+      data: {
+        articles: [],
+        categories: {},
+        tags: {}
+      }
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
