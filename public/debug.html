@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>调试页面</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        button { padding: 10px 20px; margin: 5px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; max-height: 400px; overflow-y: auto; }
+        .status { padding: 5px 10px; border-radius: 3px; font-weight: bold; }
+        .status-ok { background: #28a745; color: white; }
+        .status-error { background: #dc3545; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>知识库系统调试页面</h1>
+        
+        <div class="section">
+            <h2>1. 健康检查</h2>
+            <button onclick="testHealth()">测试 /health</button>
+            <div id="health-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>2. 文章 API 测试</h2>
+            <button onclick="testArticles()">测试 /api/articles</button>
+            <div id="articles-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>3. KV 存储测试</h2>
+            <button onclick="testKV()">测试 KV 存储</button>
+            <div id="kv-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>4. 管理员登录测试</h2>
+            <input type="password" id="admin-pwd" placeholder="输入管理员密码">
+            <button onclick="testAdminLogin()">测试登录</button>
+            <div id="admin-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>5. 初始化测试数据</h2>
+            <button onclick="initTestData()">初始化测试数据</button>
+            <div id="init-result"></div>
+        </div>
+        
+        <div class="section">
+            <h2>系统状态</h2>
+            <div id="system-status">
+                <p>等待测试...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 测试健康检查
+        async function testHealth() {
+            const resultDiv = document.getElementById('health-result');
+            resultDiv.innerHTML = '测试中...';
+            
+            try {
+                const response = await fetch('/health');
+                const text = await response.text();
+                
+                try {
+                    const json = JSON.parse(text);
+                    resultDiv.innerHTML = `
+                        <span class="status status-ok">成功</span>
+                        <pre>${JSON.stringify(json, null, 2)}</pre>
+                    `;
+                    updateSystemStatus('health', 'ok');
+                } catch (e) {
+                    resultDiv.innerHTML = `
+                        <span class="status status-error">错误</span>
+                        <p>返回的不是 JSON: ${escapeHtml(text.substring(0, 500))}</p>
+                    `;
+                    updateSystemStatus('health', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status status-error">错误</span>
+                    <p>请求失败: ${error.message}</p>
+                `;
+                updateSystemStatus('health', 'error');
+            }
+        }
+        
+        // 测试文章 API
+        async function testArticles() {
+            const resultDiv = document.getElementById('articles-result');
+            resultDiv.innerHTML = '测试中...';
+            
+            try {
+                const response = await fetch('/api/articles');
+                const text = await response.text();
+                
+                try {
+                    const json = JSON.parse(text);
+                    if (json.success) {
+                        resultDiv.innerHTML = `
+                            <span class="status status-ok">成功</span>
+                            <p>文章数量: ${json.data.articles.length}</p>
+                            <p>分类数量: ${Object.keys(json.data.categories).length}</p>
+                            <p>标签数量: ${Object.keys(json.data.tags).length}</p>
+                            <pre>${JSON.stringify(json, null, 2)}</pre>
+                        `;
+                        updateSystemStatus('articles', 'ok');
+                    } else {
+                        resultDiv.innerHTML = `
+                            <span class="status status-error">错误</span>
+                            <p>API 返回错误: ${json.error}</p>
+                        `;
+                        updateSystemStatus('articles', 'error');
+                    }
+                } catch (e) {
+                    resultDiv.innerHTML = `
+                        <span class="status status-error">错误</span>
+                        <p>返回的不是 JSON: ${escapeHtml(text.substring(0, 500))}</p>
+                    `;
+                    updateSystemStatus('articles', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status status-error">错误</span>
+                    <p>请求失败: ${error.message}</p>
+                `;
+                updateSystemStatus('articles', 'error');
+            }
+        }
+        
+        // 测试 KV 存储
+        async function testKV() {
+            const resultDiv = document.getElementById('kv-result');
+            resultDiv.innerHTML = '测试中...';
+            
+            // 通过文章 API 间接测试 KV
+            try {
+                const response = await fetch('/api/articles');
+                const result = await response.json();
+                
+                if (result.success) {
+                    resultDiv.innerHTML = `
+                        <span class="status status-ok">KV 存储正常工作</span>
+                        <p>成功从 KV 读取数据</p>
+                    `;
+                    updateSystemStatus('kv', 'ok');
+                } else {
+                    resultDiv.innerHTML = `
+                        <span class="status status-error">KV 存储错误</span>
+                        <p>错误: ${result.error}</p>
+                    `;
+                    updateSystemStatus('kv', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status status-error">KV 存储错误</span>
+                    <p>请求失败: ${error.message}</p>
+                `;
+                updateSystemStatus('kv', 'error');
+            }
+        }
+        
+        // 测试管理员登录
+        async function testAdminLogin() {
+            const password = document.getElementById('admin-pwd').value;
+            if (!password) {
+                alert('请输入密码');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('admin-result');
+            resultDiv.innerHTML = '测试中...';
+            
+            try {
+                const response = await fetch('/api/admin/data', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password })
+                });
+                
+                const text = await response.text();
+                
+                try {
+                    const json = JSON.parse(text);
+                    if (json.success) {
+                        resultDiv.innerHTML = `
+                            <span class="status status-ok">登录成功</span>
+                            <p>文章数量: ${json.data.articles.length}</p>
+                            <p>分类数量: ${Object.keys(json.data.categories).length}</p>
+                            <p>标签数量: ${Object.keys(json.data.tags).length}</p>
+                        `;
+                        updateSystemStatus('admin', 'ok');
+                    } else {
+                        resultDiv.innerHTML = `
+                            <span class="status status-error">登录失败</span>
+                            <p>错误: ${json.error}</p>
+                        `;
+                        updateSystemStatus('admin', 'error');
+                    }
+                } catch (e) {
+                    resultDiv.innerHTML = `
+                        <span class="status status-error">错误</span>
+                        <p>返回的不是 JSON: ${escapeHtml(text.substring(0, 500))}</p>
+                    `;
+                    updateSystemStatus('admin', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status status-error">错误</span>
+                    <p>请求失败: ${error.message}</p>
+                `;
+                updateSystemStatus('admin', 'error');
+            }
+        }
+        
+        // 初始化测试数据
+        async function initTestData() {
+            const password = document.getElementById('admin-pwd').value;
+            if (!password) {
+                alert('请输入管理员密码');
+                return;
+            }
+            
+            const resultDiv = document.getElementById('init-result');
+            resultDiv.innerHTML = '初始化中...';
+            
+            // 创建测试数据
+            const testData = {
+                articles: [
+                    {
+                        id: 'article1',
+                        title: '欢迎使用知识库系统',
+                        content: '这是您的第一篇知识库文章。您可以在这里记录学习笔记、工作心得或其他任何您想记录的内容。\n\n## 功能特点\n\n- 多级分类管理\n- 标签系统\n- 响应式设计\n- PWA 支持\n- 数据导入导出',
+                        categoryId: 'cat1',
+                        tagIds: ['tag1', 'tag2'],
+                        published: true,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'article2',
+                        title: 'Markdown 语法指南',
+                        content: '## 标题\n\n# 一级标题\n## 二级标题\n### 三级标题\n\n## 文本格式\n\n**粗体** *斜体* `代码`\n\n## 列表\n\n- 项目1\n- 项目2\n- 项目3\n\n## 代码块\n\n```javascript\nconsole.log("Hello, World!");\n```',
+                        categoryId: 'cat2',
+                        tagIds: ['tag2'],
+                        published: true,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString()
+                    }
+                ],
+                categories: {
+                    cat1: {
+                        id: 'cat1',
+                        name: '系统指南'
+                    },
+                    cat2: {
+                        id: 'cat2',
+                        name: '技术文档'
+                    }
+                },
+                tags: {
+                    tag1: {
+                        id: 'tag1',
+                        name: '入门'
+                    },
+                    tag2: {
+                        id: 'tag2',
+                        name: '教程'
+                    }
+                }
+            };
+            
+            try {
+                // 保存文章
+                const response = await fetch('/api/admin/articles', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        password: password,
+                        articles: testData.articles
+                    })
+                });
+                
+                const articlesResult = await response.json();
+                
+                if (articlesResult.success) {
+                    // 保存分类
+                    await fetch('/api/admin/categories', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            password: password,
+                            categories: testData.categories
+                        })
+                    });
+                    
+                    // 保存标签
+                    await fetch('/api/admin/tags', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            password: password,
+                            tags: testData.tags
+                        })
+                    });
+                    
+                    resultDiv.innerHTML = `
+                        <span class="status status-ok">初始化成功</span>
+                        <p>已创建测试数据：</p>
+                        <ul>
+                            <li>2 篇文章</li>
+                            <li>2 个分类</li>
+                            <li>2 个标签</li>
+                        </ul>
+                        <p>请刷新主页面查看效果。</p>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <span class="status status-error">初始化失败</span>
+                        <p>错误: ${articlesResult.error}</p>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <span class="status status-error">初始化失败</span>
+                    <p>错误: ${error.message}</p>
+                `;
+            }
+        }
+        
+        // 更新系统状态
+        function updateSystemStatus(component, status) {
+            const statusDiv = document.getElementById('system-status');
+            let html = '<h3>组件状态:</h3><ul>';
+            
+            // 更新状态存储
+            if (!window.systemStatus) {
+                window.systemStatus = {};
+            }
+            window.systemStatus[component] = status;
+            
+            // 生成状态列表
+            for (const [comp, stat] of Object.entries(window.systemStatus)) {
+                const statusClass = stat === 'ok' ? 'status-ok' : 'status-error';
+                html += `<li>${comp}: <span class="status ${statusClass}">${stat}</span></li>`;
+            }
+            
+            html += '</ul>';
+            statusDiv.innerHTML = html;
+        }
+        
+        function escapeHtml(unsafe) {
+            return unsafe
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+        
+        // 页面加载时自动运行基本测试
+        window.onload = function() {
+            testHealth();
+            testArticles();
+            testKV();
+        };
+    </script>
+</body>
+</html>
