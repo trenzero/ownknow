@@ -1,4 +1,4 @@
-// 前端应用主逻辑
+// 前端应用主逻辑 - 完整版本
 class KnowledgeBaseApp {
     constructor() {
         this.currentPage = 'home';
@@ -12,8 +12,17 @@ class KnowledgeBaseApp {
         this.init();
     }
     
-    init() {
+    async init() {
         this.bindEvents();
+        
+        // 先进行健康检查
+        try {
+            const health = await this.healthCheck();
+            console.log('System health:', health);
+        } catch (error) {
+            console.error('Health check failed:', error);
+        }
+        
         this.loadData();
         this.updateTheme();
     }
@@ -127,24 +136,38 @@ class KnowledgeBaseApp {
         });
     }
     
+    // API基础URL - 使用相对路径
+    getApiBaseUrl() {
+        return '';
+    }
+    
     async loadData() {
         try {
-            const response = await fetch('/api/articles');
+            console.log('Loading data from API...');
+            const response = await fetch(this.getApiBaseUrl() + '/api/articles');
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
+            console.log('Data loaded:', result);
             
             if (result.success) {
-                this.articles = result.data.articles;
-                this.categories = result.data.categories;
-                this.tags = result.data.tags;
+                this.articles = result.data.articles || [];
+                this.categories = result.data.categories || {};
+                this.tags = result.data.tags || {};
                 
                 this.renderHomePage();
                 this.renderCategoriesPage();
                 this.renderTagsPage();
             } else {
                 console.error('Failed to load data:', result.error);
+                this.showError('加载数据失败: ' + result.error);
             }
         } catch (error) {
             console.error('Error loading data:', error);
+            this.showError('加载数据失败，请检查网络连接: ' + error.message);
         }
     }
     
@@ -152,7 +175,8 @@ class KnowledgeBaseApp {
         if (!this.isAdmin) return;
         
         try {
-            const response = await fetch('/api/admin/data', {
+            console.log('Loading admin data...');
+            const response = await fetch(this.getApiBaseUrl() + '/api/admin/data', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -162,21 +186,28 @@ class KnowledgeBaseApp {
                 })
             });
             
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
+            console.log('Admin data loaded:', result);
             
             if (result.success) {
-                this.articles = result.data.articles;
-                this.categories = result.data.categories;
-                this.tags = result.data.tags;
+                this.articles = result.data.articles || [];
+                this.categories = result.data.categories || {};
+                this.tags = result.data.tags || {};
                 
                 this.renderAdminArticles();
                 this.renderAdminCategories();
                 this.renderAdminTags();
             } else {
-                alert('加载管理数据失败: ' + result.error);
+                console.error('Failed to load admin data:', result.error);
+                this.showError('加载管理数据失败: ' + result.error);
             }
         } catch (error) {
             console.error('Error loading admin data:', error);
+            this.showError('加载管理数据失败: ' + error.message);
         }
     }
     
@@ -192,11 +223,20 @@ class KnowledgeBaseApp {
         });
         
         // 显示目标页面
-        document.getElementById(`${page}-page`).classList.add('active');
+        const targetPage = document.getElementById(`${page}-page`);
+        if (targetPage) {
+            targetPage.classList.add('active');
+        } else {
+            console.error('Page not found:', page);
+            return;
+        }
         
         // 更新导航激活状态（管理页面特殊处理）
-        if (page !== 'admin') {
-            document.querySelector(`.nav-link[data-page="${page}"]`).classList.add('active');
+        if (page !== 'admin' && page !== 'admin-login') {
+            const navLink = document.querySelector(`.nav-link[data-page="${page}"]`);
+            if (navLink) {
+                navLink.classList.add('active');
+            }
         }
         
         this.currentPage = page;
@@ -217,7 +257,9 @@ class KnowledgeBaseApp {
         this.adminPassword = password;
         
         try {
-            const response = await fetch('/api/admin/data', {
+            console.log('Attempting admin login...');
+            
+            const response = await fetch(this.getApiBaseUrl() + '/api/admin/data', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -227,13 +269,20 @@ class KnowledgeBaseApp {
                 })
             });
             
+            console.log('Login response status:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
+            console.log('Login response:', result);
             
             if (result.success) {
                 this.isAdmin = true;
-                this.articles = result.data.articles;
-                this.categories = result.data.categories;
-                this.tags = result.data.tags;
+                this.articles = result.data.articles || [];
+                this.categories = result.data.categories || {};
+                this.tags = result.data.tags || {};
                 
                 this.showPage('admin');
                 this.renderAdminArticles();
@@ -242,12 +291,15 @@ class KnowledgeBaseApp {
                 
                 // 清空密码输入框
                 document.getElementById('admin-password').value = '';
+                
+                console.log('Admin login successful');
             } else {
-                alert('登录失败: ' + result.error);
+                alert('登录失败: ' + (result.error || '未知错误'));
+                console.error('Login failed:', result.error);
             }
         } catch (error) {
             console.error('Error during admin login:', error);
-            alert('登录失败，请检查网络连接');
+            alert('登录失败，请检查网络连接和API端点。错误: ' + error.message);
         }
     }
     
@@ -276,6 +328,11 @@ class KnowledgeBaseApp {
     renderHomePage() {
         const container = document.getElementById('articles-grid');
         
+        if (!container) {
+            console.error('Articles grid container not found');
+            return;
+        }
+        
         if (this.articles.length === 0) {
             container.innerHTML = '<p class="no-data">暂无文章</p>';
             return;
@@ -291,13 +348,14 @@ class KnowledgeBaseApp {
             }).join('') : '';
             
             const date = new Date(article.createdAt).toLocaleDateString('zh-CN');
+            const excerpt = article.content ? article.content.substring(0, 150) + '...' : '';
             
             return `
                 <div class="article-card" data-id="${article.id}">
-                    <h3>${article.title}</h3>
-                    <p>${article.content.substring(0, 150)}...</p>
+                    <h3>${this.escapeHtml(article.title)}</h3>
+                    <p>${this.escapeHtml(excerpt)}</p>
                     <div class="article-meta">
-                        <span class="category-badge">${categoryName}</span>
+                        <span class="category-badge">${this.escapeHtml(categoryName)}</span>
                         <div class="tags-list">${tagElements}</div>
                         <span class="article-date">${date}</span>
                     </div>
@@ -317,6 +375,11 @@ class KnowledgeBaseApp {
     renderCategoriesPage() {
         const container = document.getElementById('categories-container');
         
+        if (!container) {
+            console.error('Categories container not found');
+            return;
+        }
+        
         const categoriesArray = Object.values(this.categories);
         
         if (categoriesArray.length === 0) {
@@ -331,7 +394,7 @@ class KnowledgeBaseApp {
             
             return `
                 <div class="category-card" data-id="${category.id}">
-                    <h3>${category.name}</h3>
+                    <h3>${this.escapeHtml(category.name)}</h3>
                     <div class="count">${articleCount} 篇文章</div>
                 </div>
             `;
@@ -349,6 +412,11 @@ class KnowledgeBaseApp {
     renderTagsPage() {
         const container = document.getElementById('tags-container');
         
+        if (!container) {
+            console.error('Tags container not found');
+            return;
+        }
+        
         const tagsArray = Object.values(this.tags);
         
         if (tagsArray.length === 0) {
@@ -363,7 +431,7 @@ class KnowledgeBaseApp {
             
             return `
                 <div class="tag-card" data-id="${tag.id}">
-                    <h3>${tag.name}</h3>
+                    <h3>${this.escapeHtml(tag.name)}</h3>
                     <div class="count">${articleCount} 篇文章</div>
                 </div>
             `;
@@ -381,7 +449,10 @@ class KnowledgeBaseApp {
     showArticle(articleId) {
         const article = this.articles.find(a => a.id === articleId);
         
-        if (!article) return;
+        if (!article) {
+            console.error('Article not found:', articleId);
+            return;
+        }
         
         const category = this.categories[article.categoryId];
         const categoryName = category ? category.name : '未分类';
@@ -403,23 +474,40 @@ class KnowledgeBaseApp {
     }
     
     showCategoryArticles(categoryId) {
+        const category = this.categories[categoryId];
+        if (!category) {
+            console.error('Category not found:', categoryId);
+            return;
+        }
+        
         const filteredArticles = this.articles.filter(article => 
             article.categoryId === categoryId
         );
         
-        this.renderFilteredArticles(filteredArticles, `分类: ${this.categories[categoryId].name}`);
+        this.renderFilteredArticles(filteredArticles, `分类: ${category.name}`);
     }
     
     showTagArticles(tagId) {
+        const tag = this.tags[tagId];
+        if (!tag) {
+            console.error('Tag not found:', tagId);
+            return;
+        }
+        
         const filteredArticles = this.articles.filter(article => 
             article.tagIds && article.tagIds.includes(tagId)
         );
         
-        this.renderFilteredArticles(filteredArticles, `标签: ${this.tags[tagId].name}`);
+        this.renderFilteredArticles(filteredArticles, `标签: ${tag.name}`);
     }
     
     renderFilteredArticles(articles, title) {
         const container = document.getElementById('articles-grid');
+        
+        if (!container) {
+            console.error('Articles grid container not found');
+            return;
+        }
         
         if (articles.length === 0) {
             container.innerHTML = `<p class="no-data">${title} 下暂无文章</p>`;
@@ -436,13 +524,14 @@ class KnowledgeBaseApp {
             }).join('') : '';
             
             const date = new Date(article.createdAt).toLocaleDateString('zh-CN');
+            const excerpt = article.content ? article.content.substring(0, 150) + '...' : '';
             
             return `
                 <div class="article-card" data-id="${article.id}">
-                    <h3>${article.title}</h3>
-                    <p>${article.content.substring(0, 150)}...</p>
+                    <h3>${this.escapeHtml(article.title)}</h3>
+                    <p>${this.escapeHtml(excerpt)}</p>
                     <div class="article-meta">
-                        <span class="category-badge">${categoryName}</span>
+                        <span class="category-badge">${this.escapeHtml(categoryName)}</span>
                         <div class="tags-list">${tagElements}</div>
                         <span class="article-date">${date}</span>
                     </div>
@@ -451,7 +540,10 @@ class KnowledgeBaseApp {
         }).join('');
         
         // 更新页面标题
-        document.querySelector('#home-page .page-header h2').textContent = title;
+        const pageHeader = document.querySelector('#home-page .page-header h2');
+        if (pageHeader) {
+            pageHeader.textContent = title;
+        }
         
         // 绑定文章点击事件
         container.querySelectorAll('.article-card').forEach(card => {
@@ -469,13 +561,16 @@ class KnowledgeBaseApp {
         
         if (!query) {
             this.renderHomePage();
-            document.querySelector('#home-page .page-header h2').textContent = '最新文章';
+            const pageHeader = document.querySelector('#home-page .page-header h2');
+            if (pageHeader) {
+                pageHeader.textContent = '最新文章';
+            }
             return;
         }
         
         const filteredArticles = this.articles.filter(article => 
             article.title.toLowerCase().includes(query) || 
-            article.content.toLowerCase().includes(query)
+            (article.content && article.content.toLowerCase().includes(query))
         );
         
         this.renderFilteredArticles(filteredArticles, `搜索: ${query}`);
@@ -484,6 +579,11 @@ class KnowledgeBaseApp {
     // 管理后台渲染函数
     renderAdminArticles() {
         const container = document.getElementById('admin-articles-list');
+        
+        if (!container) {
+            console.error('Admin articles list container not found');
+            return;
+        }
         
         const articlesArray = Object.values(this.articles);
         
@@ -503,8 +603,8 @@ class KnowledgeBaseApp {
             
             return `
                 <div class="article-item">
-                    <div class="title">${article.title}</div>
-                    <span class="category">${categoryName}</span>
+                    <div class="title">${this.escapeHtml(article.title)}</div>
+                    <span class="category">${this.escapeHtml(categoryName)}</span>
                     <span class="status ${article.published ? 'published' : 'draft'}">
                         ${article.published ? '已发布' : '草稿'}
                     </span>
@@ -538,12 +638,17 @@ class KnowledgeBaseApp {
     renderAdminCategories() {
         const container = document.getElementById('categories-editor');
         
+        if (!container) {
+            console.error('Categories editor container not found');
+            return;
+        }
+        
         const categoriesArray = Object.values(this.categories);
         
         container.innerHTML = categoriesArray.map(category => {
             return `
                 <div class="category-item">
-                    <input type="text" value="${category.name}" data-id="${category.id}">
+                    <input type="text" value="${this.escapeHtml(category.name)}" data-id="${category.id}">
                     <button class="delete-category-btn" data-id="${category.id}">删除</button>
                 </div>
             `;
@@ -568,12 +673,17 @@ class KnowledgeBaseApp {
     renderAdminTags() {
         const container = document.getElementById('tags-editor');
         
+        if (!container) {
+            console.error('Tags editor container not found');
+            return;
+        }
+        
         const tagsArray = Object.values(this.tags);
         
         container.innerHTML = tagsArray.map(tag => {
             return `
                 <div class="tag-item">
-                    <input type="text" value="${tag.name}" data-id="${tag.id}">
+                    <input type="text" value="${this.escapeHtml(tag.name)}" data-id="${tag.id}">
                     <button class="delete-tag-btn" data-id="${tag.id}">删除</button>
                 </div>
             `;
@@ -600,6 +710,11 @@ class KnowledgeBaseApp {
         
         // 填充分类选择框
         const categorySelect = document.getElementById('article-category-select');
+        if (!categorySelect) {
+            console.error('Category select element not found');
+            return;
+        }
+        
         categorySelect.innerHTML = '<option value="">选择分类</option>';
         
         Object.values(this.categories).forEach(category => {
@@ -611,6 +726,11 @@ class KnowledgeBaseApp {
         
         // 填充标签选择框
         const tagsSelect = document.getElementById('article-tags-select');
+        if (!tagsSelect) {
+            console.error('Tags select element not found');
+            return;
+        }
+        
         tagsSelect.innerHTML = '';
         
         Object.values(this.tags).forEach(tag => {
@@ -643,23 +763,42 @@ class KnowledgeBaseApp {
         }
         
         // 显示模态框
-        document.getElementById('article-editor-modal').classList.add('active');
+        const modal = document.getElementById('article-editor-modal');
+        if (modal) {
+            modal.classList.add('active');
+        }
     }
     
     closeArticleEditor() {
-        document.getElementById('article-editor-modal').classList.remove('active');
+        const modal = document.getElementById('article-editor-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
         this.currentEditingArticle = null;
     }
     
     async saveArticle() {
-        const title = document.getElementById('article-title-input').value.trim();
-        const categoryId = document.getElementById('article-category-select').value;
-        const content = document.getElementById('article-content-textarea').value.trim();
-        const published = document.getElementById('article-published-checkbox').checked;
+        const titleInput = document.getElementById('article-title-input');
+        const categorySelect = document.getElementById('article-category-select');
+        const contentTextarea = document.getElementById('article-content-textarea');
+        const publishedCheckbox = document.getElementById('article-published-checkbox');
+        
+        if (!titleInput || !categorySelect || !contentTextarea || !publishedCheckbox) {
+            console.error('Form elements not found');
+            return;
+        }
+        
+        const title = titleInput.value.trim();
+        const categoryId = categorySelect.value;
+        const content = contentTextarea.value.trim();
+        const published = publishedCheckbox.checked;
         
         // 获取选中的标签
         const tagsSelect = document.getElementById('article-tags-select');
-        const tagIds = Array.from(tagsSelect.selectedOptions).map(option => option.value);
+        let tagIds = [];
+        if (tagsSelect) {
+            tagIds = Array.from(tagsSelect.selectedOptions).map(option => option.value);
+        }
         
         if (!title || !content) {
             alert('请填写标题和内容');
@@ -674,7 +813,7 @@ class KnowledgeBaseApp {
             tagIds,
             published,
             createdAt: this.currentEditingArticle ? 
-                this.articles.find(a => a.id === this.currentEditingArticle)?.createdAt || new Date().toISOString() : 
+                (this.articles.find(a => a.id === this.currentEditingArticle)?.createdAt || new Date().toISOString()) : 
                 new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
@@ -691,7 +830,7 @@ class KnowledgeBaseApp {
         
         // 保存到服务器
         try {
-            const response = await fetch('/api/admin/articles', {
+            const response = await fetch(this.getApiBaseUrl() + '/api/admin/articles', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -701,6 +840,10 @@ class KnowledgeBaseApp {
                     articles: this.articles
                 })
             });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             
             const result = await response.json();
             
@@ -713,7 +856,7 @@ class KnowledgeBaseApp {
             }
         } catch (error) {
             console.error('Error saving article:', error);
-            alert('保存失败，请检查网络连接');
+            alert('保存失败，请检查网络连接: ' + error.message);
         }
     }
     
@@ -731,7 +874,7 @@ class KnowledgeBaseApp {
         
         // 保存到服务器
         try {
-            const response = await fetch('/api/admin/articles', {
+            const response = await fetch(this.getApiBaseUrl() + '/api/admin/articles', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -741,6 +884,10 @@ class KnowledgeBaseApp {
                     articles: this.articles
                 })
             });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             
             const result = await response.json();
             
@@ -752,12 +899,18 @@ class KnowledgeBaseApp {
             }
         } catch (error) {
             console.error('Error deleting article:', error);
-            alert('删除失败，请检查网络连接');
+            alert('删除失败，请检查网络连接: ' + error.message);
         }
     }
     
     addNewCategory() {
         const container = document.getElementById('categories-editor');
+        
+        if (!container) {
+            console.error('Categories editor container not found');
+            return;
+        }
+        
         const newId = this.generateId();
         
         const newCategoryHTML = `
@@ -773,20 +926,28 @@ class KnowledgeBaseApp {
         const newInput = container.querySelector(`input[data-id="${newId}"]`);
         const newDeleteBtn = container.querySelector(`.delete-category-btn[data-id="${newId}"]`);
         
-        newInput.addEventListener('change', () => {
-            this.saveCategories();
-        });
-        
-        newDeleteBtn.addEventListener('click', () => {
-            this.deleteCategory(newId);
-        });
-        
-        // 聚焦到新输入框
-        newInput.focus();
+        if (newInput && newDeleteBtn) {
+            newInput.addEventListener('change', () => {
+                this.saveCategories();
+            });
+            
+            newDeleteBtn.addEventListener('click', () => {
+                this.deleteCategory(newId);
+            });
+            
+            // 聚焦到新输入框
+            newInput.focus();
+        }
     }
     
     async saveCategories() {
         const container = document.getElementById('categories-editor');
+        
+        if (!container) {
+            console.error('Categories editor container not found');
+            return;
+        }
+        
         const inputs = container.querySelectorAll('input');
         
         const newCategories = {};
@@ -807,7 +968,7 @@ class KnowledgeBaseApp {
         
         // 保存到服务器
         try {
-            const response = await fetch('/api/admin/categories', {
+            const response = await fetch(this.getApiBaseUrl() + '/api/admin/categories', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -818,16 +979,18 @@ class KnowledgeBaseApp {
                 })
             });
             
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
             
-            if (result.success) {
-                // 更新成功，不需要额外操作
-            } else {
+            if (!result.success) {
                 alert('保存分类失败: ' + result.error);
             }
         } catch (error) {
             console.error('Error saving categories:', error);
-            alert('保存分类失败，请检查网络连接');
+            alert('保存分类失败，请检查网络连接: ' + error.message);
         }
     }
     
@@ -854,6 +1017,12 @@ class KnowledgeBaseApp {
     
     addNewTag() {
         const container = document.getElementById('tags-editor');
+        
+        if (!container) {
+            console.error('Tags editor container not found');
+            return;
+        }
+        
         const newId = this.generateId();
         
         const newTagHTML = `
@@ -869,20 +1038,28 @@ class KnowledgeBaseApp {
         const newInput = container.querySelector(`input[data-id="${newId}"]`);
         const newDeleteBtn = container.querySelector(`.delete-tag-btn[data-id="${newId}"]`);
         
-        newInput.addEventListener('change', () => {
-            this.saveTags();
-        });
-        
-        newDeleteBtn.addEventListener('click', () => {
-            this.deleteTag(newId);
-        });
-        
-        // 聚焦到新输入框
-        newInput.focus();
+        if (newInput && newDeleteBtn) {
+            newInput.addEventListener('change', () => {
+                this.saveTags();
+            });
+            
+            newDeleteBtn.addEventListener('click', () => {
+                this.deleteTag(newId);
+            });
+            
+            // 聚焦到新输入框
+            newInput.focus();
+        }
     }
     
     async saveTags() {
         const container = document.getElementById('tags-editor');
+        
+        if (!container) {
+            console.error('Tags editor container not found');
+            return;
+        }
+        
         const inputs = container.querySelectorAll('input');
         
         const newTags = {};
@@ -903,7 +1080,7 @@ class KnowledgeBaseApp {
         
         // 保存到服务器
         try {
-            const response = await fetch('/api/admin/tags', {
+            const response = await fetch(this.getApiBaseUrl() + '/api/admin/tags', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -914,16 +1091,18 @@ class KnowledgeBaseApp {
                 })
             });
             
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
             const result = await response.json();
             
-            if (result.success) {
-                // 更新成功，不需要额外操作
-            } else {
+            if (!result.success) {
                 alert('保存标签失败: ' + result.error);
             }
         } catch (error) {
             console.error('Error saving tags:', error);
-            alert('保存标签失败，请检查网络连接');
+            alert('保存标签失败，请检查网络连接: ' + error.message);
         }
     }
     
@@ -950,7 +1129,7 @@ class KnowledgeBaseApp {
     
     async exportData() {
         try {
-            const response = await fetch('/api/admin/export', {
+            const response = await fetch(this.getApiBaseUrl() + '/api/admin/export', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -959,6 +1138,10 @@ class KnowledgeBaseApp {
                     password: this.adminPassword
                 })
             });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             
             const result = await response.json();
             
@@ -981,7 +1164,7 @@ class KnowledgeBaseApp {
             }
         } catch (error) {
             console.error('Error exporting data:', error);
-            alert('导出失败，请检查网络连接');
+            alert('导出失败，请检查网络连接: ' + error.message);
         }
     }
     
@@ -998,7 +1181,7 @@ class KnowledgeBaseApp {
             try {
                 const data = JSON.parse(e.target.result);
                 
-                const response = await fetch('/api/admin/import', {
+                const response = await fetch(this.getApiBaseUrl() + '/api/admin/import', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -1008,6 +1191,10 @@ class KnowledgeBaseApp {
                         data
                     })
                 });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
                 
                 const result = await response.json();
                 
@@ -1020,14 +1207,33 @@ class KnowledgeBaseApp {
                 }
             } catch (error) {
                 console.error('Error importing data:', error);
-                alert('导入失败，文件格式不正确');
+                alert('导入失败，文件格式不正确: ' + error.message);
             }
         };
         
         reader.readAsText(file);
         
         // 清空文件输入
-        document.getElementById('import-file').value = '';
+        const importFile = document.getElementById('import-file');
+        if (importFile) {
+            importFile.value = '';
+        }
+    }
+    
+    // 健康检查
+    async healthCheck() {
+        try {
+            const response = await fetch(this.getApiBaseUrl() + '/health');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const result = await response.json();
+            console.log('Health check:', result);
+            return result;
+        } catch (error) {
+            console.error('Health check failed:', error);
+            return { status: 'error', error: error.message };
+        }
     }
     
     // 工具函数
@@ -1036,12 +1242,28 @@ class KnowledgeBaseApp {
     }
     
     formatContent(content) {
+        if (!content) return '';
+        
         // 简单的Markdown格式处理
         return content
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
             .replace(/\n/g, '<br>')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/`(.*?)`/g, '<code>$1</code>');
+    }
+    
+    escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return '';
+        
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
     }
     
     toggleTheme() {
@@ -1053,7 +1275,9 @@ class KnowledgeBaseApp {
         
         // 更新图标
         const themeIcon = document.querySelector('.theme-icon');
-        themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        if (themeIcon) {
+            themeIcon.textContent = newTheme === 'dark' ? '🌙' : '☀️';
+        }
     }
     
     updateTheme() {
@@ -1062,7 +1286,15 @@ class KnowledgeBaseApp {
         
         // 更新图标
         const themeIcon = document.querySelector('.theme-icon');
-        themeIcon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+        if (themeIcon) {
+            themeIcon.textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+        }
+    }
+    
+    showError(message) {
+        // 简单的错误提示
+        console.error('Application Error:', message);
+        // 可以在这里添加更复杂的错误显示逻辑
     }
 }
 
