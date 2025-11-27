@@ -2,11 +2,11 @@
   "name": "personal-knowledge-base",
   "version": "1.0.0",
   "description": "Personal Knowledge Base System for Cloudflare",
-  "main": "public/worker/index.js",
+  "main": "dist/_worker.js",
   "scripts": {
     "build": "npm run build:client && npm run build:server",
-    "build:client": "esbuild public/js/app.js public/js/admin.js --bundle --outdir=dist/js --minify",
-    "build:server": "esbuild worker/index.js --bundle --outfile=dist/index.js --format=esm --minify",
+    "build:client": "mkdir -p dist && cp -r public/* dist/",
+    "build:server": "esbuild _worker.js --bundle --outfile=dist/_worker.js --format=esm --minify",
     "dev": "npm run build && wrangler pages dev dist --kv KNOWLEDGE_BASE"
   },
   "dependencies": {
