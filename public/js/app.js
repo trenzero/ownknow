@@ -1,4 +1,4 @@
-// 前端应用主逻辑 - 完整版本
+// 前端应用主逻辑 - 针对 Cloudflare Pages Functions 优化版本
 class KnowledgeBaseApp {
     constructor() {
         this.currentPage = 'home';
@@ -136,22 +136,60 @@ class KnowledgeBaseApp {
         });
     }
     
-    // API基础URL - 使用相对路径
+    // API基础URL - 使用相对路径（与前端同域）
     getApiBaseUrl() {
         return '';
     }
     
-    async loadData() {
+    // 增强的API请求方法
+    async apiRequest(endpoint, options = {}) {
+        const url = this.getApiBaseUrl() + endpoint;
+        
+        // 设置默认选项
+        const defaultOptions = {
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
+        };
+        
+        const finalOptions = { ...defaultOptions, ...options };
+        
         try {
-            console.log('Loading data from API...');
-            const response = await fetch(this.getApiBaseUrl() + '/api/articles');
+            console.log(`Making API request to: ${url}`, finalOptions);
+            
+            const response = await fetch(url, finalOptions);
+            
+            console.log(`API response status: ${response.status} ${response.statusText}`);
             
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP error! status: ${response.status} ${response.statusText}`);
             }
             
-            const result = await response.json();
-            console.log('Data loaded:', result);
+            const text = await response.text();
+            console.log(`API response text:`, text.substring(0, 200) + (text.length > 200 ? '...' : ''));
+            
+            // 尝试解析JSON
+            try {
+                return JSON.parse(text);
+            } catch (parseError) {
+                console.error('Failed to parse JSON response:', parseError);
+                throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+            }
+        } catch (error) {
+            console.error(`API request failed for ${url}:`, error);
+            throw error;
+        }
+    }
+    
+    async loadData() {
+        try {
+            console.log('Loading public data from API...');
+            const result = await this.apiRequest('/api/articles', {
+                method: 'GET'
+            });
+            
+            console.log('Public data loaded:', result);
             
             if (result.success) {
                 this.articles = result.data.articles || [];
@@ -176,21 +214,13 @@ class KnowledgeBaseApp {
         
         try {
             console.log('Loading admin data...');
-            const response = await fetch(this.getApiBaseUrl() + '/api/admin/data', {
+            const result = await this.apiRequest('/api/admin/data', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     password: this.adminPassword
                 })
             });
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const result = await response.json();
             console.log('Admin data loaded:', result);
             
             if (result.success) {
@@ -259,23 +289,13 @@ class KnowledgeBaseApp {
         try {
             console.log('Attempting admin login...');
             
-            const response = await fetch(this.getApiBaseUrl() + '/api/admin/data', {
+            const result = await this.apiRequest('/api/admin/data', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     password: this.adminPassword
                 })
             });
             
-            console.log('Login response status:', response.status);
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const result = await response.json();
             console.log('Login response:', result);
             
             if (result.success) {
@@ -299,7 +319,7 @@ class KnowledgeBaseApp {
             }
         } catch (error) {
             console.error('Error during admin login:', error);
-            alert('登录失败，请检查网络连接和API端点。错误: ' + error.message);
+            alert('登录失败: ' + error.message);
         }
     }
     
@@ -830,22 +850,13 @@ class KnowledgeBaseApp {
         
         // 保存到服务器
         try {
-            const response = await fetch(this.getApiBaseUrl() + '/api/admin/articles', {
+            const result = await this.apiRequest('/api/admin/articles', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     password: this.adminPassword,
                     articles: this.articles
                 })
             });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const result = await response.json();
             
             if (result.success) {
                 this.closeArticleEditor();
@@ -874,22 +885,13 @@ class KnowledgeBaseApp {
         
         // 保存到服务器
         try {
-            const response = await fetch(this.getApiBaseUrl() + '/api/admin/articles', {
+            const result = await this.apiRequest('/api/admin/articles', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     password: this.adminPassword,
                     articles: this.articles
                 })
             });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const result = await response.json();
             
             if (result.success) {
                 this.renderAdminArticles();
@@ -968,22 +970,13 @@ class KnowledgeBaseApp {
         
         // 保存到服务器
         try {
-            const response = await fetch(this.getApiBaseUrl() + '/api/admin/categories', {
+            const result = await this.apiRequest('/api/admin/categories', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     password: this.adminPassword,
                     categories: newCategories
                 })
             });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const result = await response.json();
             
             if (!result.success) {
                 alert('保存分类失败: ' + result.error);
@@ -1080,22 +1073,13 @@ class KnowledgeBaseApp {
         
         // 保存到服务器
         try {
-            const response = await fetch(this.getApiBaseUrl() + '/api/admin/tags', {
+            const result = await this.apiRequest('/api/admin/tags', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     password: this.adminPassword,
                     tags: newTags
                 })
             });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const result = await response.json();
             
             if (!result.success) {
                 alert('保存标签失败: ' + result.error);
@@ -1129,21 +1113,12 @@ class KnowledgeBaseApp {
     
     async exportData() {
         try {
-            const response = await fetch(this.getApiBaseUrl() + '/api/admin/export', {
+            const result = await this.apiRequest('/api/admin/export', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({
                     password: this.adminPassword
                 })
             });
-            
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const result = await response.json();
             
             if (result.success) {
                 const dataStr = JSON.stringify(result.data, null, 2);
@@ -1181,22 +1156,13 @@ class KnowledgeBaseApp {
             try {
                 const data = JSON.parse(e.target.result);
                 
-                const response = await fetch(this.getApiBaseUrl() + '/api/admin/import', {
+                const result = await this.apiRequest('/api/admin/import', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
                     body: JSON.stringify({
                         password: this.adminPassword,
                         data
                     })
                 });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const result = await response.json();
                 
                 if (result.success) {
                     // 重新加载数据
@@ -1223,11 +1189,9 @@ class KnowledgeBaseApp {
     // 健康检查
     async healthCheck() {
         try {
-            const response = await fetch(this.getApiBaseUrl() + '/health');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const result = await response.json();
+            const result = await this.apiRequest('/health', {
+                method: 'GET'
+            });
             console.log('Health check:', result);
             return result;
         } catch (error) {
@@ -1295,6 +1259,26 @@ class KnowledgeBaseApp {
         // 简单的错误提示
         console.error('Application Error:', message);
         // 可以在这里添加更复杂的错误显示逻辑
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #f56565;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            z-index: 10000;
+            max-width: 300px;
+        `;
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+        
+        setTimeout(() => {
+            if (document.body.contains(errorDiv)) {
+                document.body.removeChild(errorDiv);
+            }
+        }, 5000);
     }
 }
 
