@@ -1,0 +1,11 @@
+name = "personal-knowledge-base"
+compatibility_date = "2023-10-01"
+pages_build_output_dir = "./dist"
+
+[vars]
+ADMIN_PASSWORD = "215532"
+
+[[kv_namespaces]]
+binding = "KNOWLEDGE_BASE"
+id = "24c27128cf31441e9c3aa13db7e4a3e8"
+preview_id = "24c27128cf31441e9c3aa13db7e4a3e8"
