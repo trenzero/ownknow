@@ -2,7 +2,7 @@
   "name": "personal-knowledge-base",
   "version": "1.0.0",
   "description": "Personal Knowledge Base System for Cloudflare",
-  "main": "public/index.js",
+  "main": "public/worker/index.js",
   "scripts": {
     "build": "npm run build:client && npm run build:server",
     "build:client": "esbuild public/js/app.js public/js/admin.js --bundle --outdir=dist/js --minify",
